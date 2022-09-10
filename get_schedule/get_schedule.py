@@ -1,4 +1,5 @@
 from __future__ import print_function
+from itertools import tee, islice, chain
 
 import os.path
 
@@ -32,8 +33,91 @@ Copyright 2017 Chase Clarke cfclarke@bu.edu
 
 Modified Wed Sep 7 08:45PM 2022
 By: Mio Diaz
+Program requires python@3.10.*
 
 """
+
+#declaring the variables needed to call new_cal_event
+location: ""
+summary = ""
+start_datetime = ""
+end_datetime = ""
+description: ""
+timeZone = "\'America/New_York\'"
+
+#### TODO ######
+### https://app.swaggerhub.com/apis/DovOps/peloton-unofficial-api/
+## look into unofficial api to determine if i can grab class schedule that way
+## to remove selenium dependency, etc. 
+##
+
+def previous_and_next(some_iterable):
+    prevs, items, nexts = tee(some_iterable, 3)
+    prevs = chain([None], prevs)
+    nexts = chain(islice(nexts, 1, None), [None])
+    return zip(prevs, items, nexts)
+
+def isDay_of_week(arg):
+    if "SATURDAY" in arg:
+        return True 
+    if "SUNDAY" in arg:
+        return True
+    if "MONDAY" in arg:
+        return True 
+    if "TUESDAY" in arg:
+        return True 
+    if "WEDNESDAY" in arg:
+        return True 
+    if "THURSDAY" in arg:
+        return True 
+    if "FRIDAY" in arg:
+        return True 
+    
+    return False
+
+def is_part_of_time(arg):
+    if "AM" in arg:
+        return True
+    if "PM" in arg:
+        return True 
+    if ":" in arg:
+        return True
+
+    return False
+
+def isMonth(arg):
+    match arg:
+        case "JANUARY": 
+            return 1 
+        case "FEBURARY": 
+            return 2 
+        case "MARCH": 
+            return 3 
+        case "APRIL": 
+            return 4
+        case "MAY": 
+            return 5 
+        case "JUNE": 
+            return 6 
+        case "JULY": 
+            return 7 
+        case "AUGUST": 
+            return 8 
+        case "SEPTEMBER": 
+            return 9 
+        case "OCTOBER": 
+            return 10 
+        case "NOVEMBER": 
+            return 11
+        case "DECEMBER": 
+            return 12
+        case default:
+            return 0
+
+def convert_to_military_time(arg):
+    return arg + 12
+
+ride_sample_data = ['SATURDAY, SEPTEMBER 10\n8:00 AM\nLIVE\nINTERMEDIATE\n20 min Full Body Strength\nROBIN ARZÓN · STRENGTH\n6:00 PM\nINTERMEDIATE\n30 min AFO Upper Body Strength: Muse\nANDY SPEER · STRENGTH\nYOU’RE IN']
 
 def login(loginInfo): #this is the login function
     #loginInfo is a string of what you are logging into
@@ -89,7 +173,6 @@ def get_pelo_data(credentials):
 
     while is_logged_in == False:
         try:
-
             time.sleep(5)
 
             print(login_url)
@@ -108,14 +191,12 @@ def get_pelo_data(credentials):
 
                 driver.set_page_load_timeout(30)
                 driver.get(login_url) #url
-                # driver.maximize_window()
 
                 driver.implicitly_wait(20)
                 driver.find_element("name", "usernameOrEmail").send_keys(USERNAME) #entering the username
                 driver.find_element("name", "password").send_keys(PASSWORD) #entering the password
 
                 WebDriverWait(driver, 10).until(ExpectedConditions.element_to_be_clickable((By.XPATH, "//div[@id='__next']/section/div/div/form/button"))).click() #clicking the login button
-
 
                 time.sleep(5)
 
@@ -163,90 +244,49 @@ def get_unix_time():
     unix_time = DateTime.datetime(date_time.year, date_time.month, date_time.day, 00, 00)
     element_id_timestamp = str(time.mktime(unix_time.timetuple()))[:10]
 
-    # print(date_time)
-    # print(unix_time)
-    # print(element_id_timestamp)
-
     return element_id_timestamp
 
-    # Example output data
-    # ['THURSDAY, SEPTEMBER 8\n7:00 PM\nLIVE\n20 min Tabata Ride\nKENDALL TOOLE · CYCLING', 'FRIDAY, SEPTEMBER 9\nNo Classes', 'SATURDAY, SEPTEMBER 10\nNo Classes', 'SUNDAY, SEPTEMBER 11\nNo Classes', 'MONDAY, SEPTEMBER 12\nNo Classes', 'TUESDAY, SEPTEMBER 13\nNo Classes', 'WEDNESDAY, SEPTEMBER 14\n12:35 PM\nLIVE\n20 min Low Impact Ride\nROBIN ARZÓN · CYCLING\nYOU’RE IN', 'THURSDAY, SEPTEMBER 15\n7:00 PM\nLIVE\n30 min 90s Pop Ride\nKENDALL TOOLE · CYCLING\nYOU’RE IN', 'FRIDAY, SEPTEMBER 16\n5:30 PM\nLIVE\n30 min Latin Ride\nROBIN ARZÓN · CYCLING\nYOU’RE IN', 'SATURDAY, SEPTEMBER 17\nNo Classes', 'SUNDAY, SEPTEMBER 18\nNo Classes', 'MONDAY, SEPTEMBER 19\nNo Classes', 'TUESDAY, SEPTEMBER 20\nNo Classes', 'WEDNESDAY, SEPTEMBER 21\nNo Classes']
+def parse_event_data(data): #simplifies the data that get_pelo_data returns
 
-def simplify(data): #simplifies the data that get_pelo_data returns
-    data[0] = data[0] 
-
-    return_list = []
-    line = ""
+    return_list = ""
+    month = 0
+    day = 0
+    duration = 0
+    time_of_day = ""
 
     for x in data:
-        for y in x:
-            if y != '\n': #removes endl's
-                line = line+y
-            if y == '\n': #replaces endl's with a space
-                line = line + " "
-        # if(line[0:7] == "No Classes"):
-        #     return return_list
-        # if(line != "" and line[0:7] != "No Classes"): #appends the edited data to return_list as long as its not empty or starting with 'Summer'
-        #     return_list.append(line)
-        line = ""
+        line = x.split()
+        # parse data and build event properties
+        for previous, current, after in previous_and_next(line):
+            # skip day of week
+            if isDay_of_week(current):
+                if isMonth(after):
+                    month = isMonth(after)
+                    day = current
+            # find time 
+            if is_part_of_time(current):
+                # maybe find the time and then am / pm 
+                # use this to convert the value to the appropriate format?
+                # return correct value that can be added to the var require for the response body for the event?
+                if is_part_of_time(after):
+                    return_list = current + " " + after
+                    if after == "AM":
+                        print(return_list)
+                    if after == "PM":
+                        print("PM")
+
+            if current.isnumeric() and isMonth(previous):
+                day = current
+
+            if current.isnumeric() and "min" == after or "hr" == after:
+                duration = current
+                time_of_day = str(current) + " " + after
+                print(duration)
+                print(time_of_day)
+
+        #instead of return list we can return event body and then have the google api use this event body to create the calendar invite
     return return_list
 
-#executing the functions
-credentials = login("Peloton") #getting username and password
-
-data = get_pelo_data(credentials) #scraping the website
-print(data)
-data = simplify(data) #simplifying data
-print(data)
-calendar_api_call()
-
-#declaring the variables needed to call new_cal_event
-event = {}
-start_time_of_day = ""
-end_time_of_day = ""
-length = 0
-summary = ""
-start_datetime = ""
-end_datetime = ""
-
-### TODO
-## Research google api
-## determine how build event for calendar event
-## create function to pull duration of class and time of class to create end_time var
-## determine what part will go into the event name ++ summary 
-###
-## https://developers.google.com/calendar/api/v3/reference
-def new_cal_event(): 
-    # Build event response body for calendar event for each class in schedule
-    event = {
-      'summary': 'Google I/O 2015',
-      'location': '800 Howard St., San Francisco, CA 94103',
-      'description': 'A chance to hear more about Google\'s developer products.',
-      'start': {
-        'dateTime': '2015-05-28T09:00:00-07:00',
-        'timeZone': 'America/Los_Angeles',
-      },
-      'end': {
-        'dateTime': '2015-05-28T17:00:00-07:00',
-        'timeZone': 'America/Los_Angeles',
-      },
-      'recurrence': [
-        'RRULE:FREQ=DAILY;COUNT=2'
-      ],
-      'attendees': [
-        {'email': 'lpage@example.com'},
-        {'email': 'sbrin@example.com'},
-      ],
-      'reminders': {
-        'useDefault': False,
-        'overrides': [
-          {'method': 'email', 'minutes': 24 * 60},
-          {'method': 'popup', 'minutes': 10},
-        ],
-      },
-    }
-
-    event = service.events().insert(calendarId='primary', body=event).execute()
 
 def calendar_api_call():
 
@@ -280,21 +320,63 @@ def calendar_api_call():
         now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
         print('Getting the upcoming 10 events')
 
-        # events_result = service.events().list(calendarId='primary', timeMin=now,
-        #                                       maxResults=10, singleEvents=True,
-        #                                       orderBy='startTime').execute()
-        # events = events_result.get('items', [])
+        events_result = service.events().list(calendarId='primary', timeMin=now,
+                                              maxResults=10, singleEvents=True,
+                                              orderBy='startTime').execute()
+        events = events_result.get('items', [])
 
-        # if not events:
-        #     print('No upcoming events found.')
-        #     return
+        if not events:
+            print('No upcoming events found.')
+            return
 
-        # # Prints the start and name of the next 10 events
-        # for event in events:
-        #     start = event['start'].get('dateTime', event['start'].get('date'))
-        #     print(start, event['summary'])
+        # Prints the start and name of the next 10 events
+        for event in events:
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            print(start, event['summary'])
 
     except HttpError as error:
         print('An error occurred: %s' % error)
+
+### TODO
+## Research google api
+## determine how build event for calendar event
+## create function to pull duration of class and time of class to create end_time var
+## determine what part will go into the event name ++ summary 
+###
+## https://developers.google.com/calendar/api/v3/reference
+def new_cal_event(event): 
+    # Build event response body for calendar event for each class in schedule
+    event = {
+      'summary': summary,
+      'location': location,
+      'description': description,
+      'start': {
+        'dateTime': start_datetime,
+        'timeZone': timeZone,
+      },
+      'end': {
+        'dateTime': end_datetime,
+        'timeZone': timeZone,
+      },
+      'recurrence': [
+        'RRULE:FREQ=DAILY;COUNT=2'
+      ],
+      'reminders': {
+        'useDefault': False,
+        'overrides': [
+          {'method': 'email', 'minutes': 24 * 60},
+          {'method': 'popup', 'minutes': 10},
+        ],
+      },
+    }
+
+    event = service.events().insert(calendarId='primary', body=event).execute()
+
+#executing the functions
+# credentials = login("Peloton") #getting username and password
+# data = get_pelo_data(credentials) #scraping the website
+# print(data)
+data = parse_event_data(ride_sample_data) #simplifying data
+# calendar_api_call()
 
 print("\nYour schedule has been updated. Check your google calendar.\n")
