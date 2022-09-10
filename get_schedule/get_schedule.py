@@ -239,21 +239,15 @@ data = simplify(data) #simplifying data
 print(data)
 calendar_api_call()
 
-
 #declaring the variables needed to call new_cal_event
 event = {}
 
 start_time_of_day = ""
 end_time_of_day = ""
-
 length = 0
-
 summary = ""
-
 start_datetime = ""
 end_datetime = ""
-
-days_of_week = ""
 
 
 ### TODO
