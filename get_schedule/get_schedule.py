@@ -134,14 +134,9 @@ def get_pelo_data(credentials):
     WebDriverWait(driver, 7).until(ExpectedConditions.element_to_be_clickable((By.XPATH, "//div[@id='categories']/nav/div/div/a[2]"))).click()
 
     # # find all the dates and store that data for use later
-    # date_time = DateTime.datetime.now()
-    # # make time substring - remove 24hr portion of current time
-    # unix_timestamp_substring = str(time.mktime(date_time.timetuple()))[:5]
-    # # add in the 4 pm timestamp to the first 5 numbers in the timestamp 
-    # # to create a timestamp with the current day but time of 4 pm
     element_id_timestamp = str(get_unix_time())
 
-    print(element_id_timestamp)
+    # print(element_id_timestamp)
 
     driver.find_element("name", "week-0")
     # loop through week-0 div and get dates
@@ -164,25 +159,15 @@ def get_pelo_data(credentials):
 
 
 def get_unix_time():
- # find all the dates and store that data for use later
     date_time = date.today()
-
     unix_time = DateTime.datetime(date_time.year, date_time.month, date_time.day, 00, 00)
-
-    # make time substring - remove 24hr portion of current time
     element_id_timestamp = str(time.mktime(unix_time.timetuple()))[:10]
-    # add in the 4 pm timestamp to the first 5 numbers in the timestamp 
-    # to create a timestamp with the current day but time of 4 pm
-    # element_id_timestamp = unix_timestamp_substring + "09600"
 
     # print(date_time)
     # print(unix_time)
     # print(element_id_timestamp)
 
     return element_id_timestamp
-
-    # 1662696000
-    # 1662709600
 
     # Example output data
     # ['THURSDAY, SEPTEMBER 8\n7:00 PM\nLIVE\n20 min Tabata Ride\nKENDALL TOOLE · CYCLING', 'FRIDAY, SEPTEMBER 9\nNo Classes', 'SATURDAY, SEPTEMBER 10\nNo Classes', 'SUNDAY, SEPTEMBER 11\nNo Classes', 'MONDAY, SEPTEMBER 12\nNo Classes', 'TUESDAY, SEPTEMBER 13\nNo Classes', 'WEDNESDAY, SEPTEMBER 14\n12:35 PM\nLIVE\n20 min Low Impact Ride\nROBIN ARZÓN · CYCLING\nYOU’RE IN', 'THURSDAY, SEPTEMBER 15\n7:00 PM\nLIVE\n30 min 90s Pop Ride\nKENDALL TOOLE · CYCLING\nYOU’RE IN', 'FRIDAY, SEPTEMBER 16\n5:30 PM\nLIVE\n30 min Latin Ride\nROBIN ARZÓN · CYCLING\nYOU’RE IN', 'SATURDAY, SEPTEMBER 17\nNo Classes', 'SUNDAY, SEPTEMBER 18\nNo Classes', 'MONDAY, SEPTEMBER 19\nNo Classes', 'TUESDAY, SEPTEMBER 20\nNo Classes', 'WEDNESDAY, SEPTEMBER 21\nNo Classes']
@@ -206,30 +191,6 @@ def simplify(data): #simplifies the data that get_pelo_data returns
         line = ""
     return return_list
 
-# def start_to_militarty_time(i): 
-# #takes the start time that has been webscraped and turns it into military time
-#     start_datetime = ""
-#     if "".join(i[-2][-2:]) == "pm":
-#         if int("".join(i[-2][:-5])) != 12:
-#             start_datetime = str(int(i[-2][:-5]) + 12) + i[-2][-5:-2]
-#         if int("".join(i[-2][:-5])) == 12:
-#             start_datetime = i[-2][:-2]
-#     if "".join(i[-2][-2:]) == "am":
-#         start_datetime = i[-2][:-2]
-#     return str(start_datetime)
-
-# def end_to_military_time(i): 
-# #takes the end time that has been webscraped and turns it into military time
-#     end_datetime = ""
-#     if "".join(i[-1][-2:]) == "pm":
-#         if int("".join(i[-1][:-5])) != 12:
-#             end_datetime = str(int(i[-1][:-5]) + 12) + i[-1][-5:-2]
-#         if int("".join(i[-1][:-5])) == 12:
-#             end_datetime = i[-1][:-2]
-#     if "".join(i[-1][-2:]) == "am":
-#         end_datetime = i[-1][:-2]
-#     return str(end_datetime)
-
 #executing the functions
 credentials = login("Peloton") #getting username and password
 
@@ -241,7 +202,6 @@ calendar_api_call()
 
 #declaring the variables needed to call new_cal_event
 event = {}
-
 start_time_of_day = ""
 end_time_of_day = ""
 length = 0
@@ -249,14 +209,12 @@ summary = ""
 start_datetime = ""
 end_datetime = ""
 
-
 ### TODO
 ## Research google api
 ## determine how build event for calendar event
 ## create function to pull duration of class and time of class to create end_time var
 ## determine what part will go into the event name ++ summary 
 ###
-
 ## https://developers.google.com/calendar/api/v3/reference
 def new_cal_event(): 
     # Build event response body for calendar event for each class in schedule
@@ -290,11 +248,11 @@ def new_cal_event():
 
     event = service.events().insert(calendarId='primary', body=event).execute()
 
-#start of google API code
-# If modifying these scopes, delete the file token.json.
-SCOPES = ['https://www.googleapis.com/auth/calendar.events']
-
 def calendar_api_call():
+
+    #start of google API code
+    # If modifying these scopes, delete the file token.json.
+    SCOPES = ['https://www.googleapis.com/auth/calendar.events']
     creds = None
 
     # The file token.json stores the user's access and refresh tokens, and is
