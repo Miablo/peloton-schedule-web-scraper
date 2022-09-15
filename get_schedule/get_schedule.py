@@ -1,7 +1,8 @@
-from __future__ import print_function
 from itertools import tee, islice, chain
 
 import os.path
+import re as r
+import pytz
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -16,8 +17,6 @@ from webdrivermanager.chrome import ChromeDriverManager
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ExpectedConditions
 from selenium.webdriver.common.by import By
-
-import getpass
 
 import time
 import datetime as DateTime
@@ -37,56 +36,78 @@ Program requires python@3.10.*
 
 """
 
-#declaring the variables needed to call new_cal_event
-location: ""
-summary = ""
-start_datetime = ""
-end_datetime = ""
-description: ""
 timeZone = "\'America/New_York\'"
+
+ride_sample_data = ['SATURDAY, SEPTEMBER 10\n8:00 AM\nLIVE\nINTERMEDIATE\n20 min Full Body Strength\nROBIN ARZÓN · STRENGTH\n6:00 PM\nINTERMEDIATE\n30 min AFO Upper Body Strength: Muse\nANDY SPEER · STRENGTH\nYOU’RE IN']
 
 #### TODO ######
 ### https://app.swaggerhub.com/apis/DovOps/peloton-unofficial-api/
 ## look into unofficial api to determine if i can grab class schedule that way
 ## to remove selenium dependency, etc. 
-##
 
 def previous_and_next(some_iterable):
+    """
+
+    Parameters
+    ----------
+    data : list, required
+        data gathered during website scrap
+
+
+    Returns
+    -------
+    list
+        a list of strings used that are the header columns
+    """
     prevs, items, nexts = tee(some_iterable, 3)
     prevs = chain([None], prevs)
     nexts = chain(islice(nexts, 1, None), [None])
+
     return zip(prevs, items, nexts)
 
-def isDay_of_week(arg):
-    if "SATURDAY" in arg:
-        return True 
-    if "SUNDAY" in arg:
-        return True
-    if "MONDAY" in arg:
-        return True 
-    if "TUESDAY" in arg:
-        return True 
-    if "WEDNESDAY" in arg:
-        return True 
-    if "THURSDAY" in arg:
-        return True 
-    if "FRIDAY" in arg:
-        return True 
-    
-    return False
+def calc_end_time(duration, hour, minutes):
+    """
 
-def is_part_of_time(arg):
-    if "AM" in arg:
-        return True
-    if "PM" in arg:
-        return True 
-    if ":" in arg:
-        return True
+    Parameters
+    ----------
+    duration : int, required
+        duration of class
+    hour : string, required
+        hour class begins 
+    minutes : string, required
+        minutes class begins 
 
-    return False
+    Returns
+    -------
+    string
+        end time string calculated using duration and start time hour / minutes
+    """
 
-def isMonth(arg):
-    match arg:
+    if int(hour) <= 23:
+        if int(duration) < 60:
+            return str(str(hour) + ":" + str(int(minutes) + int(duration)))
+        elif int(duration) == 60:
+            return str(str(hour + 1) + ":" + str(int(minutes) + (duration - 60)))
+    elif int(hour) == 24 and int(duration) == 60:
+        return str(str(1) + ":" + minutes)
+
+    return None
+
+
+def isMonth(month):
+    """
+
+    Parameters
+    ----------
+    data : list, required
+        data gathered during website scrap
+
+    Returns
+    -------
+    list
+        a list of strings used that are the header columns
+    """
+    match month:
         case "JANUARY": 
             return 1 
         case "FEBURARY": 
@@ -114,14 +135,44 @@ def isMonth(arg):
         case default:
             return 0
 
-def convert_to_military_time(arg):
-    return arg + 12
+## Create ISO time format
+# >>> from datetime import datetime, timezone
 
-ride_sample_data = ['SATURDAY, SEPTEMBER 10\n8:00 AM\nLIVE\nINTERMEDIATE\n20 min Full Body Strength\nROBIN ARZÓN · STRENGTH\n6:00 PM\nINTERMEDIATE\n30 min AFO Upper Body Strength: Muse\nANDY SPEER · STRENGTH\nYOU’RE IN']
+# >>> datetime(2019, 5, 18, 15, 17, 8, 132263).isoformat()
+# datetime(year, month, day, hours, minutes, seconds, microseconds)
 
-def login(loginInfo): #this is the login function
-    #loginInfo is a string of what you are logging into
-    #userinput of username and password in a secure format
+# '2019-05-18T15:17:08.132263'
+# >>> datetime(2019, 5, 18, 15, 17, tzinfo=timezone.utc).isoformat()
+# '2019-05-18T15:17:00+00:00'
+
+def convert_to_military_time(time):
+    """
+
+    Parameters
+    ----------
+    time : string, required
+        time string found using pattern matching
+
+    Returns
+    -------
+    string
+        the updated string with the new hour replaced in the first element
+    """
+    return time.replace(time[0], str(int(time[0]) + 12))
+
+def login(loginInfo):
+    """Prompts user to enter username and password for their peloton account in the CLI and stores the data in global variables to be used by the scrapper
+
+    Parameters
+    ----------
+    data : list, required
+        data gathered during website scrap
+
+    Returns
+    -------
+    list
+        a list of strings used that are the header columns
+    """
     global username_password
 
     print("#--------------------------------------------#")
@@ -138,7 +189,18 @@ def login(loginInfo): #this is the login function
     return [USERNAME, PASSWORD]
 
 def get_pelo_data(credentials): 
-#logs into the bu website and pulls all your calendar data
+    """
+
+    Parameters
+    ----------
+    data : list, required
+        data gathered during website scrap
+    
+    Returns
+    -------
+    list
+        a list of strings used that are the header columns
+    """
     USERNAME = credentials[0]
     PASSWORD = credentials[1]
     changed_credentials = []
@@ -217,14 +279,12 @@ def get_pelo_data(credentials):
     # # find all the dates and store that data for use later
     element_id_timestamp = str(get_unix_time())
 
-    # print(element_id_timestamp)
-
     driver.find_element("name", "week-0")
     # loop through week-0 div and get dates
     for i in range(0,7): 
-        # alway calculate day that starts at 4 GMT
         temp_var =  driver.find_element("name", element_id_timestamp) 
-        return_list.append(temp_var.text) #each line is appended to the return_list
+        return_list.append(temp_var.text)
+        # find timestamp for the next day aka add 24hours to current
         element_id_timestamp = str(int(element_id_timestamp) + 86400)
 
     driver.find_element("name", "week-1")
@@ -232,64 +292,97 @@ def get_pelo_data(credentials):
     for i in range(0,7): 
         # alway calculate day that starts at 4 GMT
         temp_var =  driver.find_element("name", element_id_timestamp) 
-        return_list.append(temp_var.text) #each line is appended to the return_list
+        return_list.append(temp_var.text)
+        # find timestamp for the next day aka add 24hours to current
         element_id_timestamp = str(int(element_id_timestamp) + 86400)
         
     driver.quit() #quitting the online session
     return return_list
 
-
 def get_unix_time():
+    """Finds the unix timestamp representation timestamp is required to find all the days in the calendar using the scrapper
+
+    Returns
+    -------
+    string
+        unix timestamp for the day starting at 00:00
+    """
     date_time = date.today()
     unix_time = DateTime.datetime(date_time.year, date_time.month, date_time.day, 00, 00)
     element_id_timestamp = str(time.mktime(unix_time.timetuple()))[:10]
 
     return element_id_timestamp
 
-def parse_event_data(data): #simplifies the data that get_pelo_data returns
+def parse_event_data(data):
+    """Parses the data retrieved for each object in the returned list, splits the string into components and assigns the correct component result to the appropriate response body property in order to build the calendar event {} response body
 
-    return_list = ""
-    month = 0
-    day = 0
-    duration = 0
-    time_of_day = ""
+    Parameters
+    ----------
+    data : list, required
+        data gathered during website scrap
+
+    """
+    global month, day, year, mins, time_of_day, length_of_class, summary, class_type,class_title,start_time, end_time, duration
+
+    # duration = 0
+    # hour = 0
+    # mins = 0
+    # time_of_day = ""
+    # length_of_class = ""
+    # summary = ""
+    # class_type = ""
+    # class_title = ""
+    # start_time = ""
+    # end_time = ""
 
     for x in data:
-        line = x.split()
-        # parse data and build event properties
-        for previous, current, after in previous_and_next(line):
-            # skip day of week
-            if isDay_of_week(current):
-                if isMonth(after):
-                    month = isMonth(after)
-                    day = current
-            # find time 
-            if is_part_of_time(current):
-                # maybe find the time and then am / pm 
-                # use this to convert the value to the appropriate format?
-                # return correct value that can be added to the var require for the response body for the event?
-                if is_part_of_time(after):
-                    return_list = current + " " + after
-                    if after == "AM":
-                        print(return_list)
+        # split line at middle dot char
+        lines = x.split(chr(int(0x00B7)))
+        for line in lines:
+            class_string = line.split()
+
+            # parse data and build event properties
+            for previous, current, after in previous_and_next(class_string):
+                # build numeric date
+                if isMonth(current):
+                    month = isMonth(current)
+                    day = after
+                    year = date.today().year
+                    
+                if(r.match(r"\d{1,2}:\d\d", current) != None):
+
+                    digits = current.split(':')
+                    hour = digits[0]
+                    minutes = digits[1]
+                    time_of_day = after
+
                     if after == "PM":
-                        print("PM")
+                        start_time = convert_to_military_time(current) + " " + after
+                        hour = start_time.split(':')[0]
 
-            if current.isnumeric() and isMonth(previous):
-                day = current
+                    else:
+                        start_time = current + " " + after
 
-            if current.isnumeric() and "min" == after or "hr" == after:
-                duration = current
-                time_of_day = str(current) + " " + after
-                print(duration)
-                print(time_of_day)
+                    
+                if current.isnumeric() and isMonth(previous):
+                    day = current
+
+                if current.isnumeric() and "min" == after:
+                    duration = current
+                    length_of_class = str(current) + " " + after
+                    summary = line.split(previous)[1]
+                 
+                    if hour != None and duration != None:
+                        end_time = calc_end_time(duration, hour, minutes)
+
+        calendar_api_call()
 
         #instead of return list we can return event body and then have the google api use this event body to create the calendar invite
-    return return_list
-
 
 def calendar_api_call():
+    """
 
+    """
     #start of google API code
     # If modifying these scopes, delete the file token.json.
     SCOPES = ['https://www.googleapis.com/auth/calendar.events']
@@ -317,22 +410,23 @@ def calendar_api_call():
         service = build('calendar', 'v3', credentials=creds)
 
         # Call the Calendar API
-        now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
-        print('Getting the upcoming 10 events')
+        new_cal_event(service)
+        # now = DateTime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
+        # print('Getting the upcoming 10 events')
 
-        events_result = service.events().list(calendarId='primary', timeMin=now,
-                                              maxResults=10, singleEvents=True,
-                                              orderBy='startTime').execute()
-        events = events_result.get('items', [])
+        # events_result = service.events().list(calendarId='primary', timeMin=now,
+        #                                       maxResults=10, singleEvents=True,
+        #                                       orderBy='startTime').execute()
+        # events = events_result.get('items', [])
 
-        if not events:
-            print('No upcoming events found.')
-            return
+        # if not events:
+        #     print('No upcoming events found.')
+        #     return
 
-        # Prints the start and name of the next 10 events
-        for event in events:
-            start = event['start'].get('dateTime', event['start'].get('date'))
-            print(start, event['summary'])
+        # # Prints the start and name of the next 10 events
+        # for event in events:
+        #     start = event['start'].get('dateTime', event['start'].get('date'))
+        #     print(start, event['summary'])
 
     except HttpError as error:
         print('An error occurred: %s' % error)
@@ -344,19 +438,20 @@ def calendar_api_call():
 ## determine what part will go into the event name ++ summary 
 ###
 ## https://developers.google.com/calendar/api/v3/reference
-def new_cal_event(event): 
-    # Build event response body for calendar event for each class in schedule
+def new_cal_event(service): 
+    """
+
+
+    """
     event = {
       'summary': summary,
-      'location': location,
-      'description': description,
       'start': {
-        'dateTime': start_datetime,
-        'timeZone': timeZone,
+        'dateTime': start_time,
+        'timeZone': 'GMT-03:00',
       },
       'end': {
-        'dateTime': end_datetime,
-        'timeZone': timeZone,
+        'dateTime': end_time,
+        'timeZone': 'GMT-03:00',
       },
       'recurrence': [
         'RRULE:FREQ=DAILY;COUNT=2'
@@ -375,8 +470,6 @@ def new_cal_event(event):
 #executing the functions
 # credentials = login("Peloton") #getting username and password
 # data = get_pelo_data(credentials) #scraping the website
-# print(data)
-data = parse_event_data(ride_sample_data) #simplifying data
-# calendar_api_call()
+parse_event_data(ride_sample_data)
 
 print("\nYour schedule has been updated. Check your google calendar.\n")
